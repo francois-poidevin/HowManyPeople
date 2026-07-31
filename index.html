@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Piazza di Spagna — Live People Counter</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      background: #0a0a0a;
+      color: #f0f0f0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overflow: hidden;
+    }
+
+    #wrap {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #video {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: #000;
+      display: block;
+    }
+
+    #canvas {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    /* ── Loading overlay ── */
+    #overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.92);
+      z-index: 30;
+      padding: 24px;
+      text-align: center;
+      transition: opacity 0.6s;
+    }
+    #overlay.gone { opacity: 0; pointer-events: none; }
+
+    .title { font-size: clamp(1rem, 3vw, 1.8rem); font-weight: 700; letter-spacing: -.02em; }
+    .sub   { font-size: .8rem; color: #666; margin-top: 6px; margin-bottom: 32px; }
+
+    .spinner {
+      width: 40px; height: 40px;
+      border: 2.5px solid #222; border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      margin: 0 auto 18px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #msg { font-size: .82rem; color: #777; min-height: 20px; }
+
+    /* ── LIVE badge ── */
+    #live {
+      position: absolute; top: 14px; left: 14px;
+      background: #e63946; color: #fff;
+      font-size: .62rem; font-weight: 800; letter-spacing: .12em;
+      padding: 3px 9px 3px 7px; border-radius: 4px;
+      z-index: 10; display: none; align-items: center; gap: 5px;
+    }
+    #live::before {
+      content: ''; width: 6px; height: 6px;
+      background: #fff; border-radius: 50%;
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+
+    /* ── People counter ── */
+    #counter-box {
+      position: absolute;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      background: rgba(0,0,0,0.65);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 12px;
+      padding: 10px 22px 8px;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      min-width: 110px;
+    }
+    #counter-number {
+      font-size: clamp(2rem, 6vw, 3.5rem);
+      font-weight: 800;
+      line-height: 1;
+      color: #fff;
+      letter-spacing: -.03em;
+      font-variant-numeric: tabular-nums;
+    }
+    #counter-label {
+      font-size: .62rem;
+      font-weight: 600;
+      letter-spacing: .1em;
+      color: rgba(255,255,255,.45);
+      margin-top: 3px;
+      text-transform: uppercase;
+    }
+
+    /* ── AI status badge ── */
+    #ai-status {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      z-index: 10;
+      display: none;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0,0,0,0.55);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: .62rem;
+      font-weight: 700;
+      letter-spacing: .08em;
+      color: rgba(255,255,255,.5);
+      backdrop-filter: blur(6px);
+    }
+    #ai-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #aaa;
+      transition: background .3s;
+    }
+    #ai-dot.active { background: #4ade80; }
+    #ai-dot.loading { background: #facc15; animation: pulse 1s ease-in-out infinite; }
+
+    /* ── Bottom label ── */
+    #cam-label {
+      position: absolute; bottom: 14px; left: 14px;
+      font-size: .68rem; color: rgba(255,255,255,.25);
+      z-index: 10; pointer-events: none;
+    }
+
+    /* ── Refresh button ── */
+    #refresh {
+      position: absolute; bottom: 14px; right: 14px;
+      background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12);
+      color: rgba(255,255,255,.5); padding: 5px 13px;
+      border-radius: 6px; font-size: .72rem; cursor: pointer;
+      z-index: 10; display: none; transition: background .15s;
+    }
+    #refresh:hover { background: rgba(255,255,255,.16); }
+
+    /* ── FPS / confidence info ── */
+    #perf {
+      position: absolute; bottom: 14px; left: 50%;
+      transform: translateX(-50%);
+      font-size: .6rem; color: rgba(255,255,255,.2);
+      z-index: 10; pointer-events: none;
+      font-variant-numeric: tabular-nums;
+    }
+  </style>
+</head>
+<body>
+
+<div id="wrap">
+  <video id="video" autoplay muted playsinline crossorigin="anonymous"></video>
+  <canvas id="canvas"></canvas>
+
+  <div id="overlay">
+    <div class="title">Piazza di Spagna — Rome</div>
+    <div class="sub">Live webcam · AI people counter</div>
+    <div class="spinner"></div>
+    <div id="msg">Connecting…</div>
+  </div>
+
+  <div id="live">LIVE</div>
+
+  <div id="counter-box">
+    <div id="counter-number">0</div>
+    <div id="counter-label">People detected</div>
+  </div>
+
+  <div id="ai-status">
+    <div id="ai-dot" class="loading"></div>
+    <span id="ai-text">AI loading…</span>
+  </div>
+
+  <div id="cam-label">Piazza di Spagna · Rome · Italy</div>
+  <button id="refresh" onclick="location.reload()">↺ Refresh</button>
+  <div id="perf"></div>
+</div>
+
+<!-- HLS.js for stream playback -->
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js"></script>
+<!-- TensorFlow.js core + WebGL backend -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+<!-- COCO-SSD object detection model (includes person class) -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+
+<script>
+  /* ── Config ── */
+  const WEBCAM_PAGE = 'https://www.skylinewebcams.com/fr/webcam/italia/lazio/roma/piazza-di-spagna.html';
+  const HLS_BASE    = 'https://hd-auth.skylinewebcams.com/live.m3u8?a=';
+  const DETECT_INTERVAL_MS = 800;   // run inference every N ms
+  const PERSON_CONFIDENCE  = 0.35;  // min score to count as person
+  const BOX_COLOR          = 'rgba(74, 222, 128, 0.9)';
+  const BOX_FILL           = 'rgba(74, 222, 128, 0.08)';
+
+  const PROXIES = [
+    u => `https://cors.sh/${u}`,
+    u => `https://proxy.cors.sh/${u}`,
+    u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+    u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+  ];
+
+  /* ── DOM refs ── */
+  const video       = document.getElementById('video');
+  const canvas      = document.getElementById('canvas');
+  const ctx         = canvas.getContext('2d');
+  const overlay     = document.getElementById('overlay');
+  const msgEl       = document.getElementById('msg');
+  const liveEl      = document.getElementById('live');
+  const counterBox  = document.getElementById('counter-box');
+  const counterNum  = document.getElementById('counter-number');
+  const aiStatus    = document.getElementById('ai-status');
+  const aiDot       = document.getElementById('ai-dot');
+  const aiText      = document.getElementById('ai-text');
+  const refreshEl   = document.getElementById('refresh');
+  const perfEl      = document.getElementById('perf');
+
+  /* ── State ── */
+  let model = null;
+  let detecting = false;
+  let lastFrameTime = 0;
+  let frameCount = 0;
+  let fps = 0;
+
+  function setMsg(t) { msgEl.textContent = t; }
+
+  /* ── Token extraction ── */
+  function extractToken(html) {
+    const patterns = [
+      /source:'livee\.m3u8\?a=([^']+)'/,
+      /source:"livee\.m3u8\?a=([^"]+)"/,
+      /live\.m3u8\?a=([a-zA-Z0-9_\-]+)/,
+    ];
+    for (const p of patterns) {
+      const m = html.match(p);
+      if (m) return m[1];
+    }
+    return null;
+  }
+
+  async function tryProxy(proxyFn) {
+    const res = await fetch(proxyFn(WEBCAM_PAGE), { signal: AbortSignal.timeout(12000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    const token = extractToken(text);
+    if (!token) throw new Error('token not found');
+    return token;
+  }
+
+  async function fetchToken() {
+    for (let i = 0; i < PROXIES.length; i++) {
+      setMsg(`Fetching stream token (${i + 1}/${PROXIES.length})…`);
+      try { return await tryProxy(PROXIES[i]); }
+      catch (e) { console.warn(`Proxy ${i + 1} failed:`, e.message); }
+    }
+    throw new Error('All proxies failed');
+  }
+
+  /* ── Canvas sizing ── */
+  function syncCanvas() {
+    const vr = video.getBoundingClientRect();
+    // The video is object-fit:contain — compute actual rendered rect
+    const vw = video.videoWidth  || 1280;
+    const vh = video.videoHeight || 720;
+    const aspect = vw / vh;
+    const boxW = vr.width, boxH = vr.height;
+    let rw, rh;
+    if (boxW / boxH > aspect) { rh = boxH; rw = rh * aspect; }
+    else                       { rw = boxW; rh = rw / aspect; }
+    const rx = (boxW - rw) / 2;
+    const ry = (boxH - rh) / 2;
+
+    canvas.width  = vr.width;
+    canvas.height = vr.height;
+    return { rx, ry, rw, rh, vw, vh };
+  }
+
+  /* ── Draw detections ── */
+  function drawBoxes(predictions, layout) {
+    const { rx, ry, rw, rh, vw, vh } = layout;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const scaleX = rw / vw;
+    const scaleY = rh / vh;
+
+    let count = 0;
+    for (const p of predictions) {
+      if (p.class !== 'person' || p.score < PERSON_CONFIDENCE) continue;
+      count++;
+
+      const [bx, by, bw, bh] = p.bbox;
+      const x = rx + bx * scaleX;
+      const y = ry + by * scaleY;
+      const w = bw * scaleX;
+      const h = bh * scaleY;
+
+      ctx.strokeStyle = BOX_COLOR;
+      ctx.fillStyle   = BOX_FILL;
+      ctx.lineWidth   = 1.5;
+      ctx.beginPath();
+      ctx.roundRect(x, y, w, h, 3);
+      ctx.fill();
+      ctx.stroke();
+
+      const label = `${Math.round(p.score * 100)}%`;
+      const fontSize = Math.max(10, Math.min(13, w * 0.18));
+      ctx.font = `600 ${fontSize}px -apple-system, sans-serif`;
+      const tw = ctx.measureText(label).width;
+      const lx = x;
+      const ly = y > 18 ? y - 4 : y + h + fontSize + 2;
+
+      ctx.fillStyle = 'rgba(74,222,128,0.85)';
+      ctx.beginPath();
+      ctx.roundRect(lx, ly - fontSize, tw + 6, fontSize + 4, 3);
+      ctx.fill();
+
+      ctx.fillStyle = '#000';
+      ctx.fillText(label, lx + 3, ly);
+    }
+    return count;
+  }
+
+  /* ── Inference loop ── */
+  async function detectLoop() {
+    if (!model || video.readyState < 2 || video.paused || video.ended) {
+      requestAnimationFrame(detectLoop);
+      return;
+    }
+
+    const now = performance.now();
+    if (now - lastFrameTime < DETECT_INTERVAL_MS) {
+      requestAnimationFrame(detectLoop);
+      return;
+    }
+    lastFrameTime = now;
+
+    try {
+      aiDot.className = 'active';
+      const predictions = await model.detect(video);
+      const layout = syncCanvas();
+      const count = drawBoxes(predictions, layout);
+
+      counterNum.textContent = count;
+      aiText.textContent = 'AI active';
+
+      frameCount++;
+      const elapsed = (now - startTime) / 1000;
+      fps = Math.round(frameCount / elapsed * 10) / 10;
+      perfEl.textContent = `~${fps} fps · COCO-SSD · threshold ${PERSON_CONFIDENCE}`;
+    } catch (e) {
+      console.warn('Inference error:', e);
+      aiDot.className = '';
+    }
+
+    requestAnimationFrame(detectLoop);
+  }
+
+  let startTime = 0;
+
+  /* ── Load AI model ── */
+  async function loadModel() {
+    aiStatus.style.display = 'flex';
+    aiDot.className = 'loading';
+    aiText.textContent = 'AI loading…';
+
+    try {
+      await tf.ready();
+      // Prefer WebGL for GPU acceleration, fall back to CPU
+      await tf.setBackend('webgl');
+    } catch (_) {
+      await tf.setBackend('cpu');
+    }
+
+    model = await cocoSsd.load({ base: 'mobilenet_v2' });
+    aiDot.className = 'active';
+    aiText.textContent = 'AI ready';
+    startTime = performance.now();
+    requestAnimationFrame(detectLoop);
+  }
+
+  /* ── Stream playback ── */
+  function showLive() {
+    overlay.classList.add('gone');
+    liveEl.style.display = 'flex';
+    counterBox.style.display = 'flex';
+    refreshEl.style.display = 'block';
+  }
+
+  function play(token) {
+    const url = HLS_BASE + token;
+
+    if (Hls.isSupported()) {
+      const hls = new Hls({
+        liveSyncDurationCount: 3,
+        liveMaxLatencyDurationCount: 10,
+        enableWorker: true,
+        lowLatencyMode: true,
+      });
+      hls.loadSource(url);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        video.play().catch(() => {});
+        showLive();
+        loadModel();
+      });
+      hls.on(Hls.Events.ERROR, (_, d) => {
+        if (d.fatal) {
+          setMsg('Stream error — token expired. Click Refresh.');
+          overlay.classList.remove('gone');
+          refreshEl.style.display = 'block';
+        }
+      });
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = url;
+      video.addEventListener('loadedmetadata', () => {
+        video.play().catch(() => {});
+        showLive();
+        loadModel();
+      }, { once: true });
+    } else {
+      setMsg('HLS not supported in this browser.');
+    }
+  }
+
+  /* ── Entry point ── */
+  async function init() {
+    try {
+      const token = await fetchToken();
+      setMsg('Connecting to stream…');
+      play(token);
+    } catch (e) {
+      setMsg('Could not load stream: ' + e.message);
+      refreshEl.style.display = 'block';
+    }
+  }
+
+  /* ── Resize handler ── */
+  window.addEventListener('resize', () => {
+    if (model) syncCanvas();
+  });
+
+  init();
+</script>
+</body>
+</html>
