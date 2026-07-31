@@ -12,11 +12,16 @@ jobs:
   refresh:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Fetch token from SkylineWebcams
         run: |
+          # The Referer header is the key: SkylineWebcams only embeds the token in the
+          # page HTML when the request looks like it comes from their own site.
+          # Technique discovered in https://github.com/timmaurice/skyline-webcams
           HTML=$(curl -s --max-time 20 \
+            -H "Referer: https://www.skylinewebcams.com/" \
+            -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
             "https://www.skylinewebcams.com/fr/webcam/italia/lazio/roma/piazza-di-spagna.html")
           TOKEN=$(echo "$HTML" | grep -oP "source:'livee\.m3u8\?a=\K[^']+")
           if [ -z "$TOKEN" ]; then

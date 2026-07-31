@@ -58,3 +58,40 @@ token.json (same-origin)  →  proxy 1  →  proxy 2  →  proxy 3  →  error
 #### Why the token expires
 
 SkylineWebcams rotates tokens server-side. A token is typically valid for around 30–60 minutes. The 30-minute Action schedule ensures the committed token is always fresh enough for a visitor loading the page.
+
+---
+
+## Versions
+
+### `v1/` — Referer-based token extraction (current approach)
+
+Inspired by the technique discovered in [timmaurice/skyline-webcams](https://github.com/timmaurice/skyline-webcams), a Home Assistant integration that streams SkylineWebcams feeds as native camera entities.
+
+**The key insight:** SkylineWebcams only embeds the auth token in the page HTML when the HTTP request includes:
+
+```
+Referer: https://www.skylinewebcams.com/
+```
+
+Without this header, their backend returns a page without the player initialization block, so no token is present. With it, the full HTML is returned including:
+
+```js
+source:'livee.m3u8?a=<token>'
+```
+
+The timmaurice integration runs server-side (Python/aiohttp inside Home Assistant) so it can freely set any header. For a static GitHub Pages site the same trick is applied inside the GitHub Actions workflow:
+
+```bash
+curl -s \
+  -H "Referer: https://www.skylinewebcams.com/" \
+  -H "User-Agent: Mozilla/5.0 ..." \
+  "https://www.skylinewebcams.com/fr/webcam/italia/lazio/roma/piazza-di-spagna.html"
+```
+
+This reliably returns the token every time. The result is committed to `token.json` and served same-origin to the browser.
+
+**Stack:** HLS.js · TensorFlow.js · COCO-SSD MobileNetV2 · GitHub Actions
+
+### `index.html` (root) — same stack, earlier iteration
+
+The root `index.html` uses the same `token.json` approach but was built before the Referer trick was identified. The workflow has since been updated to use the Referer header, so both versions benefit from it.

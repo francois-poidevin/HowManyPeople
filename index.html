@@ -37,12 +37,10 @@
       position: absolute;
       width: 100%;
       height: 100%;
-      object-fit: contain;
       pointer-events: none;
       z-index: 5;
     }
 
-    /* ── Loading overlay ── */
     #overlay {
       position: absolute;
       inset: 0;
@@ -59,7 +57,7 @@
     #overlay.gone { opacity: 0; pointer-events: none; }
 
     .title { font-size: clamp(1rem, 3vw, 1.8rem); font-weight: 700; letter-spacing: -.02em; }
-    .sub   { font-size: .8rem; color: #666; margin-top: 6px; margin-bottom: 32px; }
+    .sub   { font-size: .8rem; color: #555; margin-top: 6px; margin-bottom: 32px; }
 
     .spinner {
       width: 40px; height: 40px;
@@ -69,10 +67,8 @@
       margin: 0 auto 18px;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+    #msg { font-size: .82rem; color: #666; min-height: 20px; }
 
-    #msg { font-size: .82rem; color: #777; min-height: 20px; }
-
-    /* ── LIVE badge ── */
     #live {
       position: absolute; top: 14px; left: 14px;
       background: #e63946; color: #fff;
@@ -87,16 +83,12 @@
     }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
 
-    /* ── People counter ── */
     #counter-box {
       position: absolute;
-      top: 14px;
-      left: 50%;
+      top: 14px; left: 50%;
       transform: translateX(-50%);
-      z-index: 10;
-      display: none;
-      flex-direction: column;
-      align-items: center;
+      z-index: 10; display: none;
+      flex-direction: column; align-items: center;
       background: rgba(0,0,0,0.65);
       border: 1px solid rgba(255,255,255,0.12);
       border-radius: 12px;
@@ -107,57 +99,40 @@
     }
     #counter-number {
       font-size: clamp(2rem, 6vw, 3.5rem);
-      font-weight: 800;
-      line-height: 1;
-      color: #fff;
+      font-weight: 800; line-height: 1; color: #fff;
       letter-spacing: -.03em;
       font-variant-numeric: tabular-nums;
     }
     #counter-label {
-      font-size: .62rem;
-      font-weight: 600;
-      letter-spacing: .1em;
-      color: rgba(255,255,255,.45);
-      margin-top: 3px;
-      text-transform: uppercase;
+      font-size: .62rem; font-weight: 600;
+      letter-spacing: .1em; color: rgba(255,255,255,.45);
+      margin-top: 3px; text-transform: uppercase;
     }
 
-    /* ── AI status badge ── */
     #ai-status {
-      position: absolute;
-      top: 14px;
-      right: 14px;
-      z-index: 10;
-      display: none;
-      align-items: center;
-      gap: 6px;
+      position: absolute; top: 14px; right: 14px;
+      z-index: 10; display: none;
+      align-items: center; gap: 6px;
       background: rgba(0,0,0,0.55);
       border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 6px;
-      padding: 4px 10px;
-      font-size: .62rem;
-      font-weight: 700;
-      letter-spacing: .08em;
-      color: rgba(255,255,255,.5);
+      border-radius: 6px; padding: 4px 10px;
+      font-size: .62rem; font-weight: 700;
+      letter-spacing: .08em; color: rgba(255,255,255,.5);
       backdrop-filter: blur(6px);
     }
     #ai-dot {
-      width: 6px; height: 6px;
-      border-radius: 50%;
-      background: #aaa;
-      transition: background .3s;
+      width: 6px; height: 6px; border-radius: 50%;
+      background: #aaa; transition: background .3s;
     }
-    #ai-dot.active { background: #4ade80; }
+    #ai-dot.active  { background: #4ade80; }
     #ai-dot.loading { background: #facc15; animation: pulse 1s ease-in-out infinite; }
 
-    /* ── Bottom label ── */
     #cam-label {
       position: absolute; bottom: 14px; left: 14px;
-      font-size: .68rem; color: rgba(255,255,255,.25);
+      font-size: .68rem; color: rgba(255,255,255,.22);
       z-index: 10; pointer-events: none;
     }
 
-    /* ── Refresh button ── */
     #refresh {
       position: absolute; bottom: 14px; right: 14px;
       background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12);
@@ -167,11 +142,10 @@
     }
     #refresh:hover { background: rgba(255,255,255,.16); }
 
-    /* ── FPS / confidence info ── */
     #perf {
       position: absolute; bottom: 14px; left: 50%;
       transform: translateX(-50%);
-      font-size: .6rem; color: rgba(255,255,255,.2);
+      font-size: .6rem; color: rgba(255,255,255,.18);
       z-index: 10; pointer-events: none;
       font-variant-numeric: tabular-nums;
     }
@@ -187,7 +161,7 @@
     <div class="title">Piazza di Spagna — Rome</div>
     <div class="sub">Live webcam · AI people counter</div>
     <div class="spinner"></div>
-    <div id="msg">Connecting…</div>
+    <div id="msg">Loading stream token…</div>
   </div>
 
   <div id="live">LIVE</div>
@@ -207,108 +181,68 @@
   <div id="perf"></div>
 </div>
 
-<!-- HLS.js for stream playback -->
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js"></script>
-<!-- TensorFlow.js core + WebGL backend -->
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
-<!-- COCO-SSD object detection model (includes person class) -->
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
 
 <script>
-  /* ── Config ── */
-  const WEBCAM_PAGE = 'https://www.skylinewebcams.com/fr/webcam/italia/lazio/roma/piazza-di-spagna.html';
-  const HLS_BASE    = 'https://hd-auth.skylinewebcams.com/live.m3u8?a=';
-  const TOKEN_JSON  = './token.json';
-  const DETECT_INTERVAL_MS = 800;
-  const PERSON_CONFIDENCE  = 0.35;
-  const BOX_COLOR          = 'rgba(74, 222, 128, 0.9)';
-  const BOX_FILL           = 'rgba(74, 222, 128, 0.08)';
+  /*
+   * TOKEN STRATEGY — inspired by https://github.com/timmaurice/skyline-webcams
+   *
+   * SkylineWebcams embeds the HLS auth token directly in the page HTML, but only
+   * when the HTTP request carries:
+   *   Referer: https://www.skylinewebcams.com/
+   *
+   * Browsers cannot set the Referer header on cross-origin fetch() calls (it is
+   * a forbidden header). So the token fetch must happen server-side.
+   *
+   * Solution: a GitHub Actions workflow runs every 30 min, fetches the page with
+   * the correct Referer via curl (no CORS restriction), extracts the token with
+   * grep, and commits it to token.json at the repo root. The page then reads
+   * token.json as a same-origin request — no proxy, no CORS issue.
+   */
 
-  const PROXIES = [
-    u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-    u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
-    u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
-  ];
+  const HLS_BASE       = 'https://hd-auth.skylinewebcams.com/live.m3u8?a=';
+  const TOKEN_JSON     = '../token.json';
+  const DETECT_MS      = 800;
+  const MIN_CONFIDENCE = 0.35;
+  const BOX_COLOR      = 'rgba(74, 222, 128, 0.9)';
+  const BOX_FILL       = 'rgba(74, 222, 128, 0.08)';
 
-  /* ── DOM refs ── */
-  const video       = document.getElementById('video');
-  const canvas      = document.getElementById('canvas');
-  const ctx         = canvas.getContext('2d');
-  const overlay     = document.getElementById('overlay');
-  const msgEl       = document.getElementById('msg');
-  const liveEl      = document.getElementById('live');
-  const counterBox  = document.getElementById('counter-box');
-  const counterNum  = document.getElementById('counter-number');
-  const aiStatus    = document.getElementById('ai-status');
-  const aiDot       = document.getElementById('ai-dot');
-  const aiText      = document.getElementById('ai-text');
-  const refreshEl   = document.getElementById('refresh');
-  const perfEl      = document.getElementById('perf');
+  const video      = document.getElementById('video');
+  const canvas     = document.getElementById('canvas');
+  const ctx        = canvas.getContext('2d');
+  const overlay    = document.getElementById('overlay');
+  const msgEl      = document.getElementById('msg');
+  const liveEl     = document.getElementById('live');
+  const counterBox = document.getElementById('counter-box');
+  const counterNum = document.getElementById('counter-number');
+  const aiStatus   = document.getElementById('ai-status');
+  const aiDot      = document.getElementById('ai-dot');
+  const aiText     = document.getElementById('ai-text');
+  const refreshEl  = document.getElementById('refresh');
+  const perfEl     = document.getElementById('perf');
 
-  /* ── State ── */
-  let model = null;
-  let detecting = false;
-  let lastFrameTime = 0;
-  let frameCount = 0;
-  let fps = 0;
+  let model = null, lastFrame = 0, frameCount = 0, startTime = 0;
 
   function setMsg(t) { msgEl.textContent = t; }
 
-  /* ── Token extraction ── */
-  function extractToken(html) {
-    const patterns = [
-      /source:'livee\.m3u8\?a=([^']+)'/,
-      /source:"livee\.m3u8\?a=([^"]+)"/,
-      /live\.m3u8\?a=([a-zA-Z0-9_\-]+)/,
-    ];
-    for (const p of patterns) {
-      const m = html.match(p);
-      if (m) return m[1];
-    }
-    return null;
-  }
-
-  async function fetchTokenFromJson() {
-    const res = await fetch(TOKEN_JSON + '?t=' + Date.now(), { signal: AbortSignal.timeout(8000) });
+  async function fetchToken() {
+    const res = await fetch(TOKEN_JSON + '?t=' + Date.now(), {
+      signal: AbortSignal.timeout(8000)
+    });
     if (!res.ok) throw new Error(`token.json HTTP ${res.status}`);
     const data = await res.json();
-    if (!data.token) throw new Error('no token field');
-    const age = data.updated ? (Date.now() - new Date(data.updated).getTime()) / 60000 : 0;
-    console.log(`token.json: token=${data.token}, age=${Math.round(age)}min`);
+    if (!data.token) throw new Error('token field missing');
+    const ageMin = data.updated
+      ? Math.round((Date.now() - new Date(data.updated).getTime()) / 60000)
+      : '?';
+    console.log(`[token] loaded, age=${ageMin}min`);
     return data.token;
   }
 
-  async function tryProxy(proxyFn) {
-    const res = await fetch(proxyFn(WEBCAM_PAGE), { signal: AbortSignal.timeout(12000) });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const text = await res.text();
-    const token = extractToken(text);
-    if (!token) throw new Error('token not found');
-    return token;
-  }
-
-  async function fetchToken() {
-    setMsg('Loading stream token…');
-    try {
-      const token = await fetchTokenFromJson();
-      console.log('Token loaded from token.json');
-      return token;
-    } catch (e) {
-      console.warn('token.json failed:', e.message);
-    }
-
-    for (let i = 0; i < PROXIES.length; i++) {
-      setMsg(`Fetching stream token via proxy (${i + 1}/${PROXIES.length})…`);
-      try { return await tryProxy(PROXIES[i]); }
-      catch (e) { console.warn(`Proxy ${i + 1} failed:`, e.message); }
-    }
-    throw new Error('Could not obtain stream token');
-  }
-
-  /* ── Canvas sizing ── */
   function syncCanvas() {
     const vr = video.getBoundingClientRect();
-    // The video is object-fit:contain — compute actual rendered rect
     const vw = video.videoWidth  || 1280;
     const vh = video.videoHeight || 720;
     const aspect = vw / vh;
@@ -316,32 +250,22 @@
     let rw, rh;
     if (boxW / boxH > aspect) { rh = boxH; rw = rh * aspect; }
     else                       { rw = boxW; rh = rw / aspect; }
-    const rx = (boxW - rw) / 2;
-    const ry = (boxH - rh) / 2;
-
     canvas.width  = vr.width;
     canvas.height = vr.height;
-    return { rx, ry, rw, rh, vw, vh };
+    return { rx: (boxW - rw) / 2, ry: (boxH - rh) / 2, rw, rh, vw, vh };
   }
 
-  /* ── Draw detections ── */
   function drawBoxes(predictions, layout) {
     const { rx, ry, rw, rh, vw, vh } = layout;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    const scaleX = rw / vw;
-    const scaleY = rh / vh;
-
+    const sx = rw / vw, sy = rh / vh;
     let count = 0;
-    for (const p of predictions) {
-      if (p.class !== 'person' || p.score < PERSON_CONFIDENCE) continue;
-      count++;
 
+    for (const p of predictions) {
+      if (p.class !== 'person' || p.score < MIN_CONFIDENCE) continue;
+      count++;
       const [bx, by, bw, bh] = p.bbox;
-      const x = rx + bx * scaleX;
-      const y = ry + by * scaleY;
-      const w = bw * scaleX;
-      const h = bh * scaleY;
+      const x = rx + bx * sx, y = ry + by * sy, w = bw * sx, h = bh * sy;
 
       ctx.strokeStyle = BOX_COLOR;
       ctx.fillStyle   = BOX_FILL;
@@ -351,75 +275,58 @@
       ctx.fill();
       ctx.stroke();
 
-      const label = `${Math.round(p.score * 100)}%`;
+      const label    = `${Math.round(p.score * 100)}%`;
       const fontSize = Math.max(10, Math.min(13, w * 0.18));
-      ctx.font = `600 ${fontSize}px -apple-system, sans-serif`;
+      ctx.font       = `600 ${fontSize}px -apple-system, sans-serif`;
       const tw = ctx.measureText(label).width;
-      const lx = x;
       const ly = y > 18 ? y - 4 : y + h + fontSize + 2;
 
       ctx.fillStyle = 'rgba(74,222,128,0.85)';
       ctx.beginPath();
-      ctx.roundRect(lx, ly - fontSize, tw + 6, fontSize + 4, 3);
+      ctx.roundRect(x, ly - fontSize, tw + 6, fontSize + 4, 3);
       ctx.fill();
-
       ctx.fillStyle = '#000';
-      ctx.fillText(label, lx + 3, ly);
+      ctx.fillText(label, x + 3, ly);
     }
     return count;
   }
 
-  /* ── Inference loop ── */
   async function detectLoop() {
     if (!model || video.readyState < 2 || video.paused || video.ended) {
       requestAnimationFrame(detectLoop);
       return;
     }
-
     const now = performance.now();
-    if (now - lastFrameTime < DETECT_INTERVAL_MS) {
-      requestAnimationFrame(detectLoop);
-      return;
-    }
-    lastFrameTime = now;
+    if (now - lastFrame < DETECT_MS) { requestAnimationFrame(detectLoop); return; }
+    lastFrame = now;
 
     try {
       aiDot.className = 'active';
-      const predictions = await model.detect(video);
+      const preds  = await model.detect(video);
       const layout = syncCanvas();
-      const count = drawBoxes(predictions, layout);
-
+      const count  = drawBoxes(preds, layout);
       counterNum.textContent = count;
       aiText.textContent = 'AI active';
-
       frameCount++;
-      const elapsed = (now - startTime) / 1000;
-      fps = Math.round(frameCount / elapsed * 10) / 10;
-      perfEl.textContent = `~${fps} fps · COCO-SSD · threshold ${PERSON_CONFIDENCE}`;
+      const fps = Math.round(frameCount / ((now - startTime) / 1000) * 10) / 10;
+      perfEl.textContent = `~${fps} fps · COCO-SSD · threshold ${MIN_CONFIDENCE}`;
     } catch (e) {
-      console.warn('Inference error:', e);
+      console.warn('inference error:', e);
       aiDot.className = '';
     }
-
     requestAnimationFrame(detectLoop);
   }
 
-  let startTime = 0;
-
-  /* ── Load AI model ── */
   async function loadModel() {
     aiStatus.style.display = 'flex';
     aiDot.className = 'loading';
     aiText.textContent = 'AI loading…';
-
     try {
       await tf.ready();
-      // Prefer WebGL for GPU acceleration, fall back to CPU
       await tf.setBackend('webgl');
     } catch (_) {
       await tf.setBackend('cpu');
     }
-
     model = await cocoSsd.load({ base: 'mobilenet_v2' });
     aiDot.className = 'active';
     aiText.textContent = 'AI ready';
@@ -427,7 +334,6 @@
     requestAnimationFrame(detectLoop);
   }
 
-  /* ── Stream playback ── */
   function showLive() {
     overlay.classList.add('gone');
     liveEl.style.display = 'flex';
@@ -454,7 +360,7 @@
       });
       hls.on(Hls.Events.ERROR, (_, d) => {
         if (d.fatal) {
-          setMsg('Stream error — token expired. Click Refresh.');
+          setMsg('Stream error — token may have expired. Click Refresh.');
           overlay.classList.remove('gone');
           refreshEl.style.display = 'block';
         }
@@ -471,23 +377,18 @@
     }
   }
 
-  /* ── Entry point ── */
   async function init() {
     try {
       const token = await fetchToken();
       setMsg('Connecting to stream…');
       play(token);
     } catch (e) {
-      setMsg('Could not load stream: ' + e.message);
+      setMsg('Could not load token.json: ' + e.message);
       refreshEl.style.display = 'block';
     }
   }
 
-  /* ── Resize handler ── */
-  window.addEventListener('resize', () => {
-    if (model) syncCanvas();
-  });
-
+  window.addEventListener('resize', () => { if (model) syncCanvas(); });
   init();
 </script>
 </body>
