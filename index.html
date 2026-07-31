@@ -218,16 +218,16 @@
   /* ── Config ── */
   const WEBCAM_PAGE = 'https://www.skylinewebcams.com/fr/webcam/italia/lazio/roma/piazza-di-spagna.html';
   const HLS_BASE    = 'https://hd-auth.skylinewebcams.com/live.m3u8?a=';
-  const DETECT_INTERVAL_MS = 800;   // run inference every N ms
-  const PERSON_CONFIDENCE  = 0.35;  // min score to count as person
+  const TOKEN_JSON  = './token.json';
+  const DETECT_INTERVAL_MS = 800;
+  const PERSON_CONFIDENCE  = 0.35;
   const BOX_COLOR          = 'rgba(74, 222, 128, 0.9)';
   const BOX_FILL           = 'rgba(74, 222, 128, 0.08)';
 
   const PROXIES = [
-    u => `https://cors.sh/${u}`,
-    u => `https://proxy.cors.sh/${u}`,
     u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
     u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+    u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
   ];
 
   /* ── DOM refs ── */
@@ -268,6 +268,16 @@
     return null;
   }
 
+  async function fetchTokenFromJson() {
+    const res = await fetch(TOKEN_JSON + '?t=' + Date.now(), { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) throw new Error(`token.json HTTP ${res.status}`);
+    const data = await res.json();
+    if (!data.token) throw new Error('no token field');
+    const age = data.updated ? (Date.now() - new Date(data.updated).getTime()) / 60000 : 0;
+    console.log(`token.json: token=${data.token}, age=${Math.round(age)}min`);
+    return data.token;
+  }
+
   async function tryProxy(proxyFn) {
     const res = await fetch(proxyFn(WEBCAM_PAGE), { signal: AbortSignal.timeout(12000) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -278,12 +288,21 @@
   }
 
   async function fetchToken() {
+    setMsg('Loading stream token…');
+    try {
+      const token = await fetchTokenFromJson();
+      console.log('Token loaded from token.json');
+      return token;
+    } catch (e) {
+      console.warn('token.json failed:', e.message);
+    }
+
     for (let i = 0; i < PROXIES.length; i++) {
-      setMsg(`Fetching stream token (${i + 1}/${PROXIES.length})…`);
+      setMsg(`Fetching stream token via proxy (${i + 1}/${PROXIES.length})…`);
       try { return await tryProxy(PROXIES[i]); }
       catch (e) { console.warn(`Proxy ${i + 1} failed:`, e.message); }
     }
-    throw new Error('All proxies failed');
+    throw new Error('Could not obtain stream token');
   }
 
   /* ── Canvas sizing ── */

@@ -1,0 +1,41 @@
+name: Refresh Webcam Token
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch token from SkylineWebcams
+        run: |
+          HTML=$(curl -s --max-time 20 \
+            "https://www.skylinewebcams.com/fr/webcam/italia/lazio/roma/piazza-di-spagna.html")
+          TOKEN=$(echo "$HTML" | grep -oP "source:'livee\.m3u8\?a=\K[^']+")
+          if [ -z "$TOKEN" ]; then
+            TOKEN=$(echo "$HTML" | grep -oP "source:\"livee\.m3u8\?a=\K[^\"]+")
+          fi
+          if [ -z "$TOKEN" ]; then
+            TOKEN=$(echo "$HTML" | grep -oP "live\.m3u8\?a=\K[a-zA-Z0-9_-]+")
+          fi
+          if [ -z "$TOKEN" ]; then
+            echo "ERROR: could not extract token" >&2
+            exit 1
+          fi
+          echo "Token: $TOKEN"
+          echo "{\"token\":\"$TOKEN\",\"updated\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > token.json
+
+      - name: Commit token.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add token.json
+          git diff --cached --quiet || git commit -m "chore: refresh webcam token [skip ci]"
+          git push
