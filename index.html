@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Piazza di Spagna — Live People Counter</title>
+  <title>Sunset Park Brooklyn — Live People Counter</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -24,23 +24,27 @@
       justify-content: center;
     }
 
-    #video {
+    /* Live video fills the viewport */
+    #cam-img {
       position: absolute;
+      inset: 0;
       width: 100%;
       height: 100%;
       object-fit: contain;
       background: #000;
-      display: block;
     }
 
+    /* Canvas overlays the image for bounding boxes */
     #canvas {
       position: absolute;
+      inset: 0;
       width: 100%;
       height: 100%;
       pointer-events: none;
       z-index: 5;
     }
 
+    /* ── Loading overlay ── */
     #overlay {
       position: absolute;
       inset: 0;
@@ -48,7 +52,7 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      background: rgba(0, 0, 0, 0.92);
+      background: rgba(0,0,0,0.92);
       z-index: 30;
       padding: 24px;
       text-align: center;
@@ -69,52 +73,54 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     #msg { font-size: .82rem; color: #666; min-height: 20px; }
 
-    #live {
+    /* ── LIVE badge ── */
+    #live-badge {
       position: absolute; top: 14px; left: 14px;
       background: #e63946; color: #fff;
       font-size: .62rem; font-weight: 800; letter-spacing: .12em;
       padding: 3px 9px 3px 7px; border-radius: 4px;
       z-index: 10; display: none; align-items: center; gap: 5px;
     }
-    #live::before {
+    #live-badge::before {
       content: ''; width: 6px; height: 6px;
       background: #fff; border-radius: 50%;
       animation: pulse 1.4s ease-in-out infinite;
     }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
 
+    /* ── Counter ── */
     #counter-box {
-      position: absolute;
-      top: 14px; left: 50%;
+      position: absolute; top: 14px; left: 50%;
       transform: translateX(-50%);
       z-index: 10; display: none;
       flex-direction: column; align-items: center;
-      background: rgba(0,0,0,0.65);
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 12px;
-      padding: 10px 22px 8px;
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      min-width: 110px;
+      background: rgba(0,0,0,0.70);
+      border: 1px solid rgba(255,255,255,0.13);
+      border-radius: 14px;
+      padding: 10px 24px 8px;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      min-width: 120px;
     }
     #counter-number {
-      font-size: clamp(2rem, 6vw, 3.5rem);
+      font-size: clamp(2.2rem, 6vw, 3.8rem);
       font-weight: 800; line-height: 1; color: #fff;
       letter-spacing: -.03em;
       font-variant-numeric: tabular-nums;
     }
     #counter-label {
       font-size: .62rem; font-weight: 600;
-      letter-spacing: .1em; color: rgba(255,255,255,.45);
-      margin-top: 3px; text-transform: uppercase;
+      letter-spacing: .1em; color: rgba(255,255,255,.4);
+      margin-top: 4px; text-transform: uppercase;
     }
 
+    /* ── AI status ── */
     #ai-status {
       position: absolute; top: 14px; right: 14px;
       z-index: 10; display: none;
       align-items: center; gap: 6px;
-      background: rgba(0,0,0,0.55);
-      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(0,0,0,0.60);
+      border: 1px solid rgba(255,255,255,0.10);
       border-radius: 6px; padding: 4px 10px;
       font-size: .62rem; font-weight: 700;
       letter-spacing: .08em; color: rgba(255,255,255,.5);
@@ -122,17 +128,24 @@
     }
     #ai-dot {
       width: 6px; height: 6px; border-radius: 50%;
-      background: #aaa; transition: background .3s;
+      background: #facc15; transition: background .3s;
     }
     #ai-dot.active  { background: #4ade80; }
     #ai-dot.loading { background: #facc15; animation: pulse 1s ease-in-out infinite; }
 
+    /* ── Bottom labels ── */
     #cam-label {
       position: absolute; bottom: 14px; left: 14px;
       font-size: .68rem; color: rgba(255,255,255,.22);
       z-index: 10; pointer-events: none;
     }
-
+    #next-refresh {
+      position: absolute; bottom: 14px; left: 50%;
+      transform: translateX(-50%);
+      font-size: .6rem; color: rgba(255,255,255,.18);
+      z-index: 10; pointer-events: none;
+      font-variant-numeric: tabular-nums;
+    }
     #refresh {
       position: absolute; bottom: 14px; right: 14px;
       background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12);
@@ -141,30 +154,32 @@
       z-index: 10; display: none; transition: background .15s;
     }
     #refresh:hover { background: rgba(255,255,255,.16); }
-
-    #perf {
-      position: absolute; bottom: 14px; left: 50%;
-      transform: translateX(-50%);
-      font-size: .6rem; color: rgba(255,255,255,.18);
-      z-index: 10; pointer-events: none;
-      font-variant-numeric: tabular-nums;
-    }
   </style>
 </head>
 <body>
 
 <div id="wrap">
-  <video id="video" autoplay muted playsinline crossorigin="anonymous"></video>
+  <!--
+    Source: NYSDOT / 511NY public camera network
+    Camera: I-278 at 15th Street, Sunset Park, Brooklyn
+    HLS stream: https://s7.nysdot.skyvdn.com:443/rtplive/R11_286/playlist.m3u8
+    CORS: Access-Control-Allow-Origin: * on both .m3u8 and .ts chunks (confirmed)
+    Resolution: 1280x720 HD live video
+
+    crossorigin="anonymous" on <video> keeps the canvas untainted so TF.js
+    can call model.detect(video) directly on every frame in real time.
+  -->
+  <video id="cam-img" autoplay muted playsinline crossorigin="anonymous"></video>
   <canvas id="canvas"></canvas>
 
   <div id="overlay">
-    <div class="title">Piazza di Spagna — Rome</div>
-    <div class="sub">Live webcam · AI people counter</div>
+    <div class="title">Sunset Park · Brooklyn</div>
+    <div class="sub">15th Street · Brooklyn, NY · Live</div>
     <div class="spinner"></div>
-    <div id="msg">Loading stream token…</div>
+    <div id="msg">Loading AI model…</div>
   </div>
 
-  <div id="live">LIVE</div>
+  <div id="live-badge">LIVE</div>
 
   <div id="counter-box">
     <div id="counter-number">0</div>
@@ -176,9 +191,9 @@
     <span id="ai-text">AI loading…</span>
   </div>
 
-  <div id="cam-label">Piazza di Spagna · Rome · Italy</div>
+  <div id="cam-label">I-278 @ 15th St · Sunset Park · Brooklyn · NYSDOT 511NY</div>
+  <div id="next-refresh"></div>
   <button id="refresh" onclick="location.reload()">↺ Refresh</button>
-  <div id="perf"></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js"></script>
@@ -187,60 +202,42 @@
 
 <script>
   /*
-   * TOKEN STRATEGY — inspired by https://github.com/timmaurice/skyline-webcams
+   * Source: NYSDOT / 511NY public camera network
+   * Camera: I-278 at 15th Street, Sunset Park, Brooklyn
+   * HLS: https://s9.nysdot.skyvdn.com:443/rtplive/R11_277/playlist.m3u8
+   * CORS: Access-Control-Allow-Origin: * on .m3u8 and .ts chunks
+   * Resolution: 1280x720 HD live video
    *
-   * SkylineWebcams embeds the HLS auth token directly in the page HTML, but only
-   * when the HTTP request carries:
-   *   Referer: https://www.skylinewebcams.com/
-   *
-   * Browsers cannot set the Referer header on cross-origin fetch() calls (it is
-   * a forbidden header). So the token fetch must happen server-side.
-   *
-   * Solution: a GitHub Actions workflow runs every 30 min, fetches the page with
-   * the correct Referer via curl (no CORS restriction), extracts the token with
-   * grep, and commits it to token.json at the repo root. The page then reads
-   * token.json as a same-origin request — no proxy, no CORS issue.
+   * <video crossorigin="anonymous"> + CORS: * = canvas stays untainted.
+   * TF.js calls model.detect(video) directly on every live frame.
+   * No server, no proxy, no GitHub Actions needed.
    */
 
-  const HLS_BASE       = 'https://hd-auth.skylinewebcams.com/live.m3u8?a=';
-  const TOKEN_JSON     = new URL('token.json', 'https://francois-poidevin.github.io/HowManyPeople/').href;
-  const DETECT_MS      = 800;
-  const MIN_CONFIDENCE = 0.35;
-  const BOX_COLOR      = 'rgba(74, 222, 128, 0.9)';
-  const BOX_FILL       = 'rgba(74, 222, 128, 0.08)';
+  const STREAM_URL = 'https://s7.nysdot.skyvdn.com:443/rtplive/R11_286/playlist.m3u8';
+  const DETECT_MS  = 800;
+  const MIN_CONF   = 0.30;
+  const BOX_COLOR  = 'rgba(74, 222, 128, 0.9)';
+  const BOX_FILL   = 'rgba(74, 222, 128, 0.08)';
 
-  const video      = document.getElementById('video');
+  const video      = document.getElementById('cam-img');
   const canvas     = document.getElementById('canvas');
   const ctx        = canvas.getContext('2d');
   const overlay    = document.getElementById('overlay');
   const msgEl      = document.getElementById('msg');
-  const liveEl     = document.getElementById('live');
+  const liveBadge  = document.getElementById('live-badge');
   const counterBox = document.getElementById('counter-box');
   const counterNum = document.getElementById('counter-number');
   const aiStatus   = document.getElementById('ai-status');
   const aiDot      = document.getElementById('ai-dot');
   const aiText     = document.getElementById('ai-text');
   const refreshEl  = document.getElementById('refresh');
-  const perfEl     = document.getElementById('perf');
+  const nextRefEl  = document.getElementById('next-refresh');
 
   let model = null, lastFrame = 0, frameCount = 0, startTime = 0;
 
   function setMsg(t) { msgEl.textContent = t; }
 
-  async function fetchToken() {
-    const res = await fetch(TOKEN_JSON + '?t=' + Date.now(), {
-      signal: AbortSignal.timeout(8000)
-    });
-    if (!res.ok) throw new Error(`token.json HTTP ${res.status}`);
-    const data = await res.json();
-    if (!data.token) throw new Error('token field missing');
-    const ageMin = data.updated
-      ? Math.round((Date.now() - new Date(data.updated).getTime()) / 60000)
-      : '?';
-    console.log(`[token] loaded, age=${ageMin}min`);
-    return data.token;
-  }
-
+  /* ── Canvas sizing (object-fit: contain) ── */
   function syncCanvas() {
     const vr = video.getBoundingClientRect();
     const vw = video.videoWidth  || 1280;
@@ -255,6 +252,7 @@
     return { rx: (boxW - rw) / 2, ry: (boxH - rh) / 2, rw, rh, vw, vh };
   }
 
+  /* ── Draw bounding boxes ── */
   function drawBoxes(predictions, layout) {
     const { rx, ry, rw, rh, vw, vh } = layout;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -262,7 +260,7 @@
     let count = 0;
 
     for (const p of predictions) {
-      if (p.class !== 'person' || p.score < MIN_CONFIDENCE) continue;
+      if (p.class !== 'person' || p.score < MIN_CONF) continue;
       count++;
       const [bx, by, bw, bh] = p.bbox;
       const x = rx + bx * sx, y = ry + by * sy, w = bw * sx, h = bh * sy;
@@ -291,6 +289,7 @@
     return count;
   }
 
+  /* ── Inference loop ── */
   async function detectLoop() {
     if (!model || video.readyState < 2 || video.paused || video.ended) {
       requestAnimationFrame(detectLoop);
@@ -309,67 +308,57 @@
       aiText.textContent = 'AI active';
       frameCount++;
       const fps = Math.round(frameCount / ((now - startTime) / 1000) * 10) / 10;
-      perfEl.textContent = `~${fps} fps · COCO-SSD · threshold ${MIN_CONFIDENCE}`;
+      nextRefEl.textContent = `~${fps} fps · COCO-SSD · conf ≥${MIN_CONF}`;
     } catch (e) {
       console.warn('inference error:', e);
-      aiDot.className = '';
     }
     requestAnimationFrame(detectLoop);
   }
 
+  /* ── Load AI model ── */
   async function loadModel() {
     aiStatus.style.display = 'flex';
     aiDot.className = 'loading';
     aiText.textContent = 'AI loading…';
     try {
       await tf.ready();
-      await tf.setBackend('webgl');
-    } catch (_) {
-      await tf.setBackend('cpu');
+      try { await tf.setBackend('webgl'); } catch (_) { await tf.setBackend('cpu'); }
+      model = await cocoSsd.load({ base: 'mobilenet_v2' });
+      aiDot.className = 'active';
+      aiText.textContent = 'AI ready';
+      startTime = performance.now();
+      requestAnimationFrame(detectLoop);
+    } catch (e) {
+      aiText.textContent = 'AI error';
+      console.error('Model load failed:', e);
     }
-    model = await cocoSsd.load({ base: 'mobilenet_v2' });
-    aiDot.className = 'active';
-    aiText.textContent = 'AI ready';
-    startTime = performance.now();
-    requestAnimationFrame(detectLoop);
   }
 
-  function showLive() {
-    overlay.classList.add('gone');
-    liveEl.style.display = 'flex';
-    counterBox.style.display = 'flex';
-    refreshEl.style.display = 'block';
-  }
-
-  function play(token) {
-    const url = HLS_BASE + token;
-
+  /* ── HLS playback ── */
+  function play() {
     if (Hls.isSupported()) {
-      const hls = new Hls({
-        liveSyncDurationCount: 3,
-        liveMaxLatencyDurationCount: 10,
-        enableWorker: true,
-        lowLatencyMode: true,
-      });
-      hls.loadSource(url);
+      const hls = new Hls({ liveSyncDurationCount: 3, liveMaxLatencyDurationCount: 10, enableWorker: true });
+      hls.loadSource(STREAM_URL);
       hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         video.play().catch(() => {});
-        showLive();
+        overlay.classList.add('gone');
+        liveBadge.style.display = 'flex';
+        counterBox.style.display = 'flex';
+        refreshEl.style.display = 'block';
         loadModel();
       });
       hls.on(Hls.Events.ERROR, (_, d) => {
-        if (d.fatal) {
-          setMsg('Stream error — token may have expired. Click Refresh.');
-          overlay.classList.remove('gone');
-          refreshEl.style.display = 'block';
-        }
+        if (d.fatal) { setMsg('Stream error. Click Refresh.'); overlay.classList.remove('gone'); }
       });
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = url;
+      video.src = STREAM_URL;
       video.addEventListener('loadedmetadata', () => {
         video.play().catch(() => {});
-        showLive();
+        overlay.classList.add('gone');
+        liveBadge.style.display = 'flex';
+        counterBox.style.display = 'flex';
+        refreshEl.style.display = 'block';
         loadModel();
       }, { once: true });
     } else {
@@ -377,19 +366,10 @@
     }
   }
 
-  async function init() {
-    try {
-      const token = await fetchToken();
-      setMsg('Connecting to stream…');
-      play(token);
-    } catch (e) {
-      setMsg('Could not load token.json: ' + e.message);
-      refreshEl.style.display = 'block';
-    }
-  }
-
   window.addEventListener('resize', () => { if (model) syncCanvas(); });
-  init();
+
+  setMsg('Connecting to live stream…');
+  play();
 </script>
 </body>
 </html>
